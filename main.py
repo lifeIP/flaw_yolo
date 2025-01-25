@@ -51,6 +51,15 @@ else:
     cv2.createTrackbar('Crop Down', 'Controls', 479, 480, on_trackbar_change)
     cv2.createTrackbar('Confidence Threshold', 'Controls', 9998, 9999, on_trackbar_change)
 
+
+    from manage_service_data import get_service_data_from_file
+    cv2.setTrackbarPos('Crop Left', 'Controls', int(get_service_data_from_file("crop_left")))
+    cv2.setTrackbarPos('Crop Right', 'Controls', int(get_service_data_from_file("crop_right")))
+    cv2.setTrackbarPos('Crop Up', 'Controls', int(get_service_data_from_file("crop_up")))
+    cv2.setTrackbarPos('Crop Down', 'Controls', int(get_service_data_from_file("crop_down")))
+    cv2.setTrackbarPos('Confidence Threshold', 'Controls', int(get_service_data_from_file("confidence_threshold")))
+
+
     # Основной цикл обработки кадров
     while True:
         ret, frame = cap.read()
@@ -71,9 +80,9 @@ else:
             cropped_frame = frame[crop_up:crop_down, crop_left:crop_right]
             
 
-        detections = model(cropped_frame)[0]
-        img_with_bounding_boxes = draw_bounding_boxes(cropped_frame.copy(), detections, float(confidence_threshold)/10000)
-        cv2.imshow('Neuro', img_with_bounding_boxes)
+            detections = model(cropped_frame)[0]
+            img_with_bounding_boxes = draw_bounding_boxes(cropped_frame.copy(), detections, float(confidence_threshold)/10000)
+            cv2.imshow('Neuro', img_with_bounding_boxes)
             
 
         cv2.imshow('Video', frame)
@@ -82,6 +91,13 @@ else:
         key = cv2.waitKey(1)
         if key == 27:  # Код клавиши ESC
             break
+        if key == ord("s"):
+            from manage_service_data import set_service_data_into_file
+            set_service_data_into_file("crop_left", crop_left)
+            set_service_data_into_file("crop_right", crop_right)
+            set_service_data_into_file("crop_up", crop_up)
+            set_service_data_into_file("crop_down", crop_down)
+            set_service_data_into_file("confidence_threshold", confidence_threshold)
 
     # Освобождаем ресурсы камеры
     cap.release()
