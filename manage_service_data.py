@@ -8,14 +8,14 @@ LIST_OF_VALUES = [
     "confidence_threshold"
 ]
 
-def get_service_data_from_file(prop):
+def get_service_data_from_file(prop, id = 0):
     if prop not in LIST_OF_VALUES: 
         print("not in LIST_OF_VALUES")
         return None
 
     try:
         line = list()
-        with open(SERVICE_FILE_NAME + prop, "r") as f:
+        with open(SERVICE_FILE_NAME + f"{id}/" + prop, "r") as f:
             line = f.readline()
         return str(line).rstrip("\n")
     except:
@@ -23,7 +23,7 @@ def get_service_data_from_file(prop):
     return None
 
 
-def set_service_data_into_file(prop, value: str = ""):
+def set_service_data_into_file(prop, value: str = "", id = 0):
     
     value = str(value)
 
@@ -39,12 +39,12 @@ def set_service_data_into_file(prop, value: str = ""):
 
     try:
         line = list()
-        with open(SERVICE_FILE_NAME + prop, "r") as f:
+        with open(SERVICE_FILE_NAME + f"{id}/" + prop, "r") as f:
             line = f.readline()
 
         line = value + "\n"
         
-        with open(SERVICE_FILE_NAME + prop, "w") as f:
+        with open(SERVICE_FILE_NAME + f"{id}/" + prop, "w") as f:
             f.writelines(line)
     except:
         pass
