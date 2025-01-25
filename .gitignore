@@ -1,0 +1,5 @@
+.venv/
+/yolov8s.pt
+
+__pycache__/
+*.py[cod]
