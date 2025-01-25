@@ -72,7 +72,7 @@ else:
             
 
         detections = model(cropped_frame)[0]
-        img_with_bounding_boxes = draw_bounding_boxes(cropped_frame, detections, float(confidence_threshold)/10000)
+        img_with_bounding_boxes = draw_bounding_boxes(cropped_frame.copy(), detections, float(confidence_threshold)/10000)
         cv2.imshow('Neuro', img_with_bounding_boxes)
             
 
