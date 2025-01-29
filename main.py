@@ -22,7 +22,7 @@ model = YOLO(MODEL_PATH)
 
 
 
-def get_image_from_cam(cam_index, array_cam, frame_rate):
+def get_image_from_cam(cam_index, array_cam, frame_rate, start_or_stop):
     cap = cv2.VideoCapture(cam_index)
     calculated_time_on_frame:float = 1.0 / frame_rate
     
@@ -55,7 +55,7 @@ def get_image_from_cam(cam_index, array_cam, frame_rate):
 
 
 
-def yolo_data_processing(array_cam, confidence_threshold):
+def yolo_data_processing(array_cam, confidence_threshold, start_or_stop):
     
 
     while(True):
@@ -85,6 +85,60 @@ def yolo_data_processing(array_cam, confidence_threshold):
 
 
 
+class ManagePThread(QThread):
+    
+    def run(self):
+        manager = mp.Manager()
+
+        array_cam_0 = manager.list()
+        array_cam_1 = manager.list()
+        array_cam_2 = manager.list()
+        array_cam_3 = manager.list()
+        start_or_stop = manager.list([True])
+
+        
+        cam_index_0 = 4  
+        cam_index_1 = 2
+        cam_index_2 = 4
+        cam_index_3 = 6
+        frame_rate = 5
+        confidence_threshold = 4500 # 0 - 9999
+
+        thread_0 = mp.Process(target=get_image_from_cam, args=(cam_index_0, array_cam_0, frame_rate, start_or_stop))
+        # thread_1 = mp.Process(target=get_image_from_cam, args=(cam_index_1, array_cam_1, frame_rate, start_or_stop))
+        # thread_2 = mp.Process(target=get_image_from_cam, args=(cam_index_2, array_cam_2, frame_rate, start_or_stop))
+        # thread_3 = mp.Process(target=get_image_from_cam, args=(cam_index_3, array_cam_3, frame_rate, start_or_stop))
+        
+        
+        thread_4 = mp.Process(target=yolo_data_processing, args=(array_cam_0, confidence_threshold, start_or_stop))
+        # thread_5 = mp.Process(target=yolo_data_processing, args=(array_cam_1, confidence_threshold, start_or_stop))
+        # thread_6 = mp.Process(target=yolo_data_processing, args=(array_cam_2, confidence_threshold, start_or_stop))
+        # thread_7 = mp.Process(target=yolo_data_processing, args=(array_cam_3, confidence_threshold, start_or_stop))
+
+
+        thread_0.start()
+        # thread_1.start()
+        # thread_2.start()
+        # thread_3.start()
+        
+        thread_4.start()
+        # thread_5.start()
+        # thread_6.start()
+        # thread_7.start()
+
+        thread_0.join()
+        # thread_1.join()
+        # thread_2.join()
+        # thread_3.join()
+        
+        thread_4.join()
+        # thread_5.join()
+        # thread_6.join()
+        # thread_7.join()
+
+    
+
+
 class App(QWidget):
     def keyPressEvent(self, event):
         # если нажата клавиша F11
@@ -110,137 +164,84 @@ class App(QWidget):
         self.width = 640
         self.height = 480
 
+        self.count_of_defects = 0
+
+
+        self.worker_thread = QThread(self)
+        self.manage = ManagePThread()
+        
         self.initUI()
 
+    pyqtSlot()
+    def slot_reset_defects_counter(self):
+        self.count_of_defects = 0
 
+
+    def slot_button_stop_or_start_line(self):
+        print("Stop/Start")
 
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
 
+        label_count_of_defects_name = QLabel("КОЛИЧЕСТВО ДЕФЕКТОВ")
+        label_count_of_defects_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label_count_of_defects_name.setFont(QFont(None, 28))
 
+
+        self.label_count_of_defects = QLabel(f"{self.count_of_defects}")
+        self.label_count_of_defects.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_count_of_defects.setFont(QFont(None, 62))
+
+
+        button_reset_counter = QPushButton("СБРОСИТЬ СЧЕТЧИК")
+        button_reset_counter.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
+        button_reset_counter.setFont(QFont(None, 28))
+        button_reset_counter.clicked.connect(self.slot_reset_defects_counter)
+
+
+        self.label_timer = QLabel("0 сек")
+        self.label_timer.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
+        self.label_timer.setFont(QFont(None, 28))
+        self.label_timer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+
+        self.label_status = QLabel("СТАТУС")
+        self.label_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_status.setFont(QFont(None, 28))
+
+
+        placeholder = QWidget()
+        placeholder.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
+
+
+        self.button_stop_or_start_line = QPushButton()
+        self.button_stop_or_start_line.setText("Запустить дефектоскоп")
+        self.button_stop_or_start_line.clicked.connect(self.slot_button_stop_or_start_line)
+        self.button_stop_or_start_line.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
+        self.button_stop_or_start_line.setFont(QFont(None, 28))
+
+
+        layout_vertical_box_main = QVBoxLayout(self)
+        layout_vertical_box_main.addWidget(label_count_of_defects_name, 2)
+        layout_vertical_box_main.addWidget(self.label_count_of_defects, 2)
+        layout_vertical_box_main.addWidget(button_reset_counter, 1)
+        layout_vertical_box_main.addWidget(placeholder, 5)
+        layout_vertical_box_main.addWidget(self.label_timer, 1)
+        layout_vertical_box_main.addWidget(self.label_status, 2)
+        layout_vertical_box_main.addWidget(self.button_stop_or_start_line, 4)
+
+        
+        self.manage.moveToThread(self.worker_thread)
+        self.worker_thread.start()
 
         self.show()
-
 
 
   
 
 if __name__ == "__main__":
-    manager = mp.Manager()
-
-    array_cam_0 = manager.list()
-    array_cam_1 = manager.list()
-    array_cam_2 = manager.list()
-    array_cam_3 = manager.list()
-    
-    
-    cam_index_0 = 4  
-    cam_index_1 = 2
-    cam_index_2 = 4
-    cam_index_3 = 6
-    frame_rate = 5
-    confidence_threshold = 4500 # 0 - 9999
-
-    thread_0 = mp.Process(target=get_image_from_cam, args=(cam_index_0, array_cam_0, frame_rate))
-    # thread_1 = mp.Process(target=get_image_from_cam, args=(cam_index_1, array_cam_1, frame_rate))
-    # thread_2 = mp.Process(target=get_image_from_cam, args=(cam_index_2, array_cam_2, frame_rate))
-    # thread_3 = mp.Process(target=get_image_from_cam, args=(cam_index_3, array_cam_3, frame_rate))
-    
-    
-    thread_4 = mp.Process(target=yolo_data_processing, args=(array_cam_0, confidence_threshold))
-    # thread_5 = mp.Process(target=yolo_data_processing, args=(array_cam_1, confidence_threshold))
-    # thread_6 = mp.Process(target=yolo_data_processing, args=(array_cam_2, confidence_threshold))
-    # thread_7 = mp.Process(target=yolo_data_processing, args=(array_cam_3, confidence_threshold))
-
-
-    thread_0.start()
-    # thread_1.start()
-    # thread_2.start()
-    # thread_3.start()
-    
-    thread_4.start()
-    # thread_5.start()
-    # thread_6.start()
-    # thread_7.start()
-
-
     # Запуск графического приложения
     app = QApplication(sys.argv)
     ex = App()
-    sys.exit(app.exec())
-
-
-    thread_0.join()
-    # thread_1.join()
-    # thread_2.join()
-    # thread_3.join()
-    
-    thread_4.join()
-    # thread_5.join()
-    # thread_6.join()
-    # thread_7.join()
- 
-
-
-
-
-
-# if not cap.isOpened():
-#     print("Не удалось открыть камеру")
-    
-# else:
-#     if IS_DEBUG:
-#         cv2.namedWindow('Video')
-#         cv2.namedWindow('Controls')
-#         from src.work_with_trackbars import create_trackbar
-#         create_trackbar('Controls')
-#         from src.work_with_trackbars import load_trackbar_value_from_file
-#         load_trackbar_value_from_file('Controls', ID)
-
-
-#     # Основной цикл обработки кадров
-#     while True:
-#         ret, frame = cap.read()
-        
-#         if not ret:
-#             break
-        
-        
-#         if IS_DEBUG:
-#             from src.work_with_trackbars import get_crop_values
-#             crop_left, crop_right, crop_up, crop_down, confidence_threshold = get_crop_values('Controls')
-#         else:
-#             from src.work_with_files import load_settings_from_file
-#             crop_left, crop_right, crop_up, crop_down, confidence_threshold = load_settings_from_file(0)
-
-
-        
-
-#         if crop_right > crop_left and crop_down > crop_up:
-#             # Обрезаем изображение в соответствии с полученными значениями
-#             cropped_frame = frame[crop_up:crop_down, crop_left:crop_right]
-            
-#             detections = model(cropped_frame)[0]
-
-#             from src.draw_something import draw_bounding_boxes
-#             img_with_bounding_boxes = draw_bounding_boxes(cropped_frame.copy(), detections, float(confidence_threshold)/10000)
-            
-#             cv2.imshow('Neuro', img_with_bounding_boxes)
-        
-
-#         cv2.imshow('Video', frame)
-        
-
-#         key = cv2.waitKey(1)
-#         if key == ord("q"):
-#             break
-#         if key == ord("s"):
-#             from src.work_with_files import save_settings_into_file
-#             save_settings_into_file(crop_left, crop_right, crop_up, crop_down, confidence_threshold, ID)
-
-#     # Освобождаем ресурсы камеры
-#     cap.release()
-    
-#     # Закрываем все окна
-#     cv2.destroyAllWindows()
+    sys.exit(app.exec()) 
