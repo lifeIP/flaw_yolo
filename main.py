@@ -128,7 +128,9 @@ class ManagePThread(QThread):
     
     pyqtSlot(bool)
     def slot_exit_thread(self, exit: bool):
+        self.mlock.acquire()
         self.start_or_stop[1] = exit
+        self.mlock.release()
 
     def run(self):
         thread_0 = mp.Process(target=get_image_from_cam, args=(self.cam_index_0, self.array_cam_0, self.frame_rate, self.start_or_stop))
@@ -178,16 +180,23 @@ class App(QWidget):
         self.initUI()
 
     signal_start_or_stop = pyqtSignal(bool)
+    signal_close_thread = pyqtSignal(bool)
 
     pyqtSlot()
     def slot_reset_defects_counter(self):
         self.count_of_defects = 0
 
-
+    def closeEvent(self, e):
+        self.signal_close_thread.emit(True)
+        e.accept()
+    
+    
     def slot_button_stop_or_start_line(self):
         print("Stop/Start")
         self.is_line_start = not self.is_line_start
         self.signal_start_or_stop.emit(self.is_line_start)
+
+
 
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -241,6 +250,7 @@ class App(QWidget):
         layout_vertical_box_main.addWidget(self.button_stop_or_start_line, 4)
 
         self.signal_start_or_stop.connect(self.manage.slot_start_stop)
+        self.signal_close_thread.connect(self.manage.slot_exit_thread)
         self.manage.moveToThread(self.worker_thread)
         self.worker_thread.start()
 
