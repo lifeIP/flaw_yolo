@@ -38,12 +38,12 @@ def get_image_from_cam(cam_index, array_cam, frame_rate, start_or_stop):
         start_time = time.time()
         ret, frame = cap.read()
 
+        if start_or_stop[1]:
+            break
+
         if not start_or_stop[0]:
             print("continue")
             continue
-
-        elif start_or_stop[1]:
-            break
 
         if not ret:
             break
@@ -62,7 +62,7 @@ def get_image_from_cam(cam_index, array_cam, frame_rate, start_or_stop):
 
 
 
-def yolo_data_processing(array_cam, confidence_threshold, start_or_stop):
+def yolo_data_processing(array_cam, confidence_threshold, start_or_stop, counts_of_flaws):
     
 
     while(True):
@@ -91,7 +91,25 @@ def yolo_data_processing(array_cam, confidence_threshold, start_or_stop):
             
             cv2.imwrite(f"{directory_empty}/{time.time_ns()}.png", opencv_array)
 
-            draw_bounding_boxes(opencv_array.copy(), obj, float(confidence_threshold)/10000)
+
+            directory_with_boxes = f"images/boxes/{datetime.today().strftime('%Y/%m/%d')}"
+            file_name = time.time_ns()
+            
+            for data in obj.boxes.data.tolist():
+                # extract the confidence (i.e., probability) associated with the detection
+                confidence = data[4]
+
+                if float(confidence) < float(confidence_threshold)/10000:
+                    continue
+
+
+                if not os.path.exists(directory_with_boxes):
+                    os.makedirs(directory_with_boxes)
+
+                xmin, ymin, xmax, ymax = int(data[0]), int(data[1]), int(data[2]), int(data[3])
+                cv2.rectangle(opencv_array, (xmin, ymin) , (xmax, ymax), (0, 255, 0), 2)
+                
+                cv2.imwrite(f"{directory_with_boxes}/{file_name}.png", opencv_array)
 
 
 
@@ -106,7 +124,7 @@ class ManagePThread(QThread):
         self.cam_index_3 = 6
         self.frame_rate = 5
         self.confidence_threshold = 4500 # 0 - 9999
-
+        
 
         self.manager = mp.Manager()
         self.mlock = mp.Lock()
@@ -116,7 +134,7 @@ class ManagePThread(QThread):
         self.array_cam_2 = self.manager.list()
         self.array_cam_3 = self.manager.list()
         self.start_or_stop = self.manager.list([True, False])
-
+        self.counts_of_flaws = self.manager.list([0, 0, 0, 0])
 
         self.start()
 
@@ -134,7 +152,7 @@ class ManagePThread(QThread):
 
     def run(self):
         thread_0 = mp.Process(target=get_image_from_cam, args=(self.cam_index_0, self.array_cam_0, self.frame_rate, self.start_or_stop))
-        thread_4 = mp.Process(target=yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop))
+        thread_4 = mp.Process(target=yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
         
 
         thread_0.start()
