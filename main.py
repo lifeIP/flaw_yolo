@@ -38,6 +38,13 @@ def get_image_from_cam(cam_index, array_cam, frame_rate, start_or_stop):
         start_time = time.time()
         ret, frame = cap.read()
 
+        if not start_or_stop[0]:
+            print("continue")
+            continue
+
+        elif start_or_stop[1]:
+            break
+
         if not ret:
             break
 
@@ -59,11 +66,14 @@ def yolo_data_processing(array_cam, confidence_threshold, start_or_stop):
     
 
     while(True):
+        if start_or_stop[1]:
+            break
+
         arr = list()
 
         for img in array_cam:
             arr.append(Image.fromarray(img))
-        print(len(arr))
+        
         if len(arr) == 0: continue
         
         array_cam[:]=[]
@@ -87,54 +97,49 @@ def yolo_data_processing(array_cam, confidence_threshold, start_or_stop):
 
 class ManagePThread(QThread):
     
+    def __init__(self):
+        super().__init__()
+        
+        self.cam_index_0 = 0 
+        self.cam_index_1 = 2
+        self.cam_index_2 = 4
+        self.cam_index_3 = 6
+        self.frame_rate = 5
+        self.confidence_threshold = 4500 # 0 - 9999
+
+
+        self.manager = mp.Manager()
+        self.mlock = mp.Lock()
+
+        self.array_cam_0 = self.manager.list()
+        self.array_cam_1 = self.manager.list()
+        self.array_cam_2 = self.manager.list()
+        self.array_cam_3 = self.manager.list()
+        self.start_or_stop = self.manager.list([True, False])
+
+
+        self.start()
+
+    pyqtSlot(bool)
+    def slot_start_stop(self, start: bool):
+        self.mlock.acquire()
+        self.start_or_stop[0] = start
+        self.mlock.release()
+    
+    pyqtSlot(bool)
+    def slot_exit_thread(self, exit: bool):
+        self.start_or_stop[1] = exit
+
     def run(self):
-        manager = mp.Manager()
-
-        array_cam_0 = manager.list()
-        array_cam_1 = manager.list()
-        array_cam_2 = manager.list()
-        array_cam_3 = manager.list()
-        start_or_stop = manager.list([True])
-
+        thread_0 = mp.Process(target=get_image_from_cam, args=(self.cam_index_0, self.array_cam_0, self.frame_rate, self.start_or_stop))
+        thread_4 = mp.Process(target=yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop))
         
-        cam_index_0 = 4  
-        cam_index_1 = 2
-        cam_index_2 = 4
-        cam_index_3 = 6
-        frame_rate = 5
-        confidence_threshold = 4500 # 0 - 9999
-
-        thread_0 = mp.Process(target=get_image_from_cam, args=(cam_index_0, array_cam_0, frame_rate, start_or_stop))
-        # thread_1 = mp.Process(target=get_image_from_cam, args=(cam_index_1, array_cam_1, frame_rate, start_or_stop))
-        # thread_2 = mp.Process(target=get_image_from_cam, args=(cam_index_2, array_cam_2, frame_rate, start_or_stop))
-        # thread_3 = mp.Process(target=get_image_from_cam, args=(cam_index_3, array_cam_3, frame_rate, start_or_stop))
-        
-        
-        thread_4 = mp.Process(target=yolo_data_processing, args=(array_cam_0, confidence_threshold, start_or_stop))
-        # thread_5 = mp.Process(target=yolo_data_processing, args=(array_cam_1, confidence_threshold, start_or_stop))
-        # thread_6 = mp.Process(target=yolo_data_processing, args=(array_cam_2, confidence_threshold, start_or_stop))
-        # thread_7 = mp.Process(target=yolo_data_processing, args=(array_cam_3, confidence_threshold, start_or_stop))
-
 
         thread_0.start()
-        # thread_1.start()
-        # thread_2.start()
-        # thread_3.start()
-        
         thread_4.start()
-        # thread_5.start()
-        # thread_6.start()
-        # thread_7.start()
 
         thread_0.join()
-        # thread_1.join()
-        # thread_2.join()
-        # thread_3.join()
-        
         thread_4.join()
-        # thread_5.join()
-        # thread_6.join()
-        # thread_7.join()
 
     
 
@@ -165,12 +170,14 @@ class App(QWidget):
         self.height = 480
 
         self.count_of_defects = 0
-
+        self.is_line_start = True
 
         self.worker_thread = QThread(self)
         self.manage = ManagePThread()
         
         self.initUI()
+
+    signal_start_or_stop = pyqtSignal(bool)
 
     pyqtSlot()
     def slot_reset_defects_counter(self):
@@ -179,6 +186,8 @@ class App(QWidget):
 
     def slot_button_stop_or_start_line(self):
         print("Stop/Start")
+        self.is_line_start = not self.is_line_start
+        self.signal_start_or_stop.emit(self.is_line_start)
 
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -231,7 +240,7 @@ class App(QWidget):
         layout_vertical_box_main.addWidget(self.label_status, 2)
         layout_vertical_box_main.addWidget(self.button_stop_or_start_line, 4)
 
-        
+        self.signal_start_or_stop.connect(self.manage.slot_start_stop)
         self.manage.moveToThread(self.worker_thread)
         self.worker_thread.start()
 
