@@ -57,30 +57,12 @@ def yolo_data_processing(array_cam, confidence_threshold):
         detections = model(arr)
 
         for obj in detections:
-            
-            for data in obj.boxes.data.tolist():
-                confidence = data[4]
-                
-                if float(confidence) < confidence_threshold / 10000:
-                    continue
-
-                xmin, ymin, xmax, ymax = int(data[0]), int(data[1]), int(data[2]), int(data[3])
-                
-                # print(confidence, xmin, ymin, xmax, ymax)
+            from src.draw_something import draw_bounding_boxes
+            opencv_array = cv2.cvtColor(obj.orig_img, cv2.COLOR_RGB2BGR)
+            draw_bounding_boxes(opencv_array.copy(), obj, float(confidence_threshold)/10000)
+    
         
 
-        # from src.draw_something import draw_bounding_boxes
-        # opencv_array = cv2.cvtColor(detections.orig_img, cv2.COLOR_RGB2BGR)
-        # img_with_bounding_boxes = draw_bounding_boxes(opencv_array.copy(), detections, float(confidence_threshold)/10000)
-        # cv2.imshow('Video', img_with_bounding_boxes)
-        
-
-        # key = cv2.waitKey(1)
-        # if key == ord("q"):
-        #     break
-
-        
-        
 
 
 
@@ -93,11 +75,11 @@ if __name__ == "__main__":
     array_cam_2 = manager.list()
     array_cam_3 = manager.list()
     
-    cam_index_0 = 4
+    cam_index_0 = 4  
     cam_index_1 = 2
     cam_index_2 = 4
     cam_index_3 = 6
-    frame_rate = 15
+    frame_rate = 25
     confidence_threshold = 4500 # 0 - 9999
 
     thread_0 = mp.Process(target=get_image_from_cam, args=(cam_index_0, array_cam_0, frame_rate))
@@ -105,7 +87,10 @@ if __name__ == "__main__":
     # thread_2 = mp.Process(target=get_image_from_cam, args=(cam_index_2, array_cam_2, frame_rate))
     # thread_3 = mp.Process(target=get_image_from_cam, args=(cam_index_3, array_cam_3, frame_rate))
     
-    thread_4 = mp.Process(target=yolo_data_processing, args=(array_cam_0, frame_rate))
+    thread_4 = mp.Process(target=yolo_data_processing, args=(array_cam_0, confidence_threshold))
+    # thread_5 = mp.Process(target=yolo_data_processing, args=(array_cam_1, confidence_threshold))
+    # thread_6 = mp.Process(target=yolo_data_processing, args=(array_cam_2, confidence_threshold))
+    # thread_7 = mp.Process(target=yolo_data_processing, args=(array_cam_3, confidence_threshold))
 
 
 
@@ -114,13 +99,21 @@ if __name__ == "__main__":
     # thread_1.start()
     # thread_2.start()
     # thread_3.start()
+    
     thread_4.start()
+    # thread_5.start()
+    # thread_6.start()
+    # thread_7.start()
 
     thread_0.join()
     # thread_1.join()
     # thread_2.join()
     # thread_3.join()
+    
     thread_4.join()
+    # thread_5.join()
+    # thread_6.join()
+    # thread_7.join()
  
 
 

@@ -2,5 +2,7 @@
 /yolov8s.pt
 /yolo11m.pt
 
+*.png
+
 __pycache__/
 *.py[cod]
