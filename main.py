@@ -22,96 +22,6 @@ model = YOLO(MODEL_PATH)
 
 
 
-def get_image_from_cam(cam_index, array_cam, frame_rate, start_or_stop):
-    cap = cv2.VideoCapture(cam_index)
-    calculated_time_on_frame:float = 1.0 / frame_rate
-    
-    from src.work_with_files import load_settings_from_file
-    crop_left, crop_right, crop_up, crop_down, confidence_threshold = load_settings_from_file(0)
-
-    
-    if not cap.isOpened():
-        print(f"Не удалось открыть камеру {cam_index}")
-        return
-
-    while True:
-        start_time = time.time()
-        ret, frame = cap.read()
-
-        if start_or_stop[1]:
-            break
-
-        if not start_or_stop[0]:
-            print("continue")
-            continue
-
-        if not ret:
-            break
-
-        cropped_frame = frame[crop_up:crop_down, crop_left:crop_right]
-        array_cam.append(cropped_frame)
-        
-        
-        
-        time_on_frame = time.time() - start_time
-           
-        if calculated_time_on_frame - time_on_frame > 0:
-            time.sleep(calculated_time_on_frame - time_on_frame)
-        
-        #TODO: надо реализовать функцию, которая отвечает за переполнение буфера
-
-
-
-def yolo_data_processing(array_cam, confidence_threshold, start_or_stop, counts_of_flaws):
-    
-
-    while(True):
-        if start_or_stop[1]:
-            break
-
-        arr = list()
-
-        for img in array_cam:
-            arr.append(Image.fromarray(img))
-        
-        if len(arr) == 0: continue
-        
-        array_cam[:]=[]
-        detections = model(arr)
-
-        for obj in detections:
-            from src.draw_something import draw_bounding_boxes
-            opencv_array = cv2.cvtColor(obj.orig_img, cv2.COLOR_RGB2BGR)
-            
-
-            directory_empty = f"images/empty/{datetime.today().strftime('%Y/%m/%d')}"
-            
-            if not os.path.exists(directory_empty):
-                os.makedirs(directory_empty)
-            
-            cv2.imwrite(f"{directory_empty}/{time.time_ns()}.png", opencv_array)
-
-
-            directory_with_boxes = f"images/boxes/{datetime.today().strftime('%Y/%m/%d')}"
-            file_name = time.time_ns()
-            
-            for data in obj.boxes.data.tolist():
-                # extract the confidence (i.e., probability) associated with the detection
-                confidence = data[4]
-
-                if float(confidence) < float(confidence_threshold)/10000:
-                    continue
-
-
-                if not os.path.exists(directory_with_boxes):
-                    os.makedirs(directory_with_boxes)
-
-                xmin, ymin, xmax, ymax = int(data[0]), int(data[1]), int(data[2]), int(data[3])
-                cv2.rectangle(opencv_array, (xmin, ymin) , (xmax, ymax), (0, 255, 0), 2)
-                
-                cv2.imwrite(f"{directory_with_boxes}/{file_name}.png", opencv_array)
-
-
 
 class ManagePThread(QThread):
     
@@ -133,7 +43,7 @@ class ManagePThread(QThread):
         self.array_cam_1 = self.manager.list()
         self.array_cam_2 = self.manager.list()
         self.array_cam_3 = self.manager.list()
-        self.start_or_stop = self.manager.list([True, False])
+        self.start_or_stop = self.manager.list([False, False])
         self.counts_of_flaws = self.manager.list([0, 0, 0, 0])
 
         self.start()
@@ -150,9 +60,98 @@ class ManagePThread(QThread):
         self.start_or_stop[1] = exit
         self.mlock.release()
 
+    def get_image_from_cam(self, cam_index, array_cam, frame_rate, start_or_stop):
+        cap = cv2.VideoCapture(cam_index)
+        calculated_time_on_frame:float = 1.0 / frame_rate
+        
+        from src.work_with_files import load_settings_from_file
+        crop_left, crop_right, crop_up, crop_down, confidence_threshold = load_settings_from_file(0)
+
+        
+        if not cap.isOpened():
+            print(f"Не удалось открыть камеру {cam_index}")
+            return
+
+        while True:
+            start_time = time.time()
+            ret, frame = cap.read()
+
+            if start_or_stop[1]:
+                break
+
+            if not start_or_stop[0]:
+                continue
+
+            if not ret:
+                break
+
+            cropped_frame = frame[crop_up:crop_down, crop_left:crop_right]
+            array_cam.append(cropped_frame)
+            
+            
+            
+            time_on_frame = time.time() - start_time
+            
+            if calculated_time_on_frame - time_on_frame > 0:
+                time.sleep(calculated_time_on_frame - time_on_frame)
+            
+            #TODO: надо реализовать функцию, которая отвечает за переполнение буфера
+
+
+
+    def yolo_data_processing(self, array_cam, confidence_threshold, start_or_stop, counts_of_flaws):
+        
+
+        while(True):
+            if start_or_stop[1]:
+                break
+
+            arr = list()
+
+            for img in array_cam:
+                arr.append(Image.fromarray(img))
+            
+            if len(arr) == 0: continue
+            
+            array_cam[:]=[]
+            detections = model(arr)
+
+            for obj in detections:
+                from src.draw_something import draw_bounding_boxes
+                opencv_array = cv2.cvtColor(obj.orig_img, cv2.COLOR_RGB2BGR)
+                
+
+                directory_empty = f"images/empty/{datetime.today().strftime('%Y/%m/%d')}"
+                
+                if not os.path.exists(directory_empty):
+                    os.makedirs(directory_empty)
+                
+                cv2.imwrite(f"{directory_empty}/{time.time_ns()}.png", opencv_array)
+
+
+                directory_with_boxes = f"images/boxes/{datetime.today().strftime('%Y/%m/%d')}"
+                file_name = time.time_ns()
+                
+                for data in obj.boxes.data.tolist():
+                    # extract the confidence (i.e., probability) associated with the detection
+                    confidence = data[4]
+
+                    if float(confidence) < float(confidence_threshold)/10000:
+                        continue
+
+
+                    if not os.path.exists(directory_with_boxes):
+                        os.makedirs(directory_with_boxes)
+
+                    xmin, ymin, xmax, ymax = int(data[0]), int(data[1]), int(data[2]), int(data[3])
+                    cv2.rectangle(opencv_array, (xmin, ymin) , (xmax, ymax), (0, 255, 0), 2)
+                    
+                    cv2.imwrite(f"{directory_with_boxes}/{file_name}.png", opencv_array)
+
+
     def run(self):
-        thread_0 = mp.Process(target=get_image_from_cam, args=(self.cam_index_0, self.array_cam_0, self.frame_rate, self.start_or_stop))
-        thread_4 = mp.Process(target=yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
+        thread_0 = mp.Process(target=self.get_image_from_cam, args=(self.cam_index_0, self.array_cam_0, self.frame_rate, self.start_or_stop))
+        thread_4 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
         
 
         thread_0.start()
@@ -190,12 +189,14 @@ class App(QWidget):
         self.height = 480
 
         self.count_of_defects = 0
-        self.is_line_start = True
+        self.is_line_start = False
 
         self.worker_thread = QThread(self)
         self.manage = ManagePThread()
         
         self.initUI()
+        self.slot_change_status(1 if self.is_line_start else 0)
+
 
     signal_start_or_stop = pyqtSignal(bool)
     signal_close_thread = pyqtSignal(bool)
@@ -213,8 +214,22 @@ class App(QWidget):
         print("Stop/Start")
         self.is_line_start = not self.is_line_start
         self.signal_start_or_stop.emit(self.is_line_start)
+        self.slot_change_status(1 if self.is_line_start else 0)
 
-
+    @pyqtSlot(int)
+    def slot_change_status(self, status):
+        if status == 1:
+            self.label_status.setText("СТАТУС: <b style='color: green;'>РАБОТЕТ</b>")
+            self.button_stop_or_start_line.setText("Остановить дефектоскоп")
+            self.line_status = 1
+        elif status == 0:
+            self.label_status.setText("СТАТУС: <b style='color: blue;'>ОСТАНОВЛЕН</b>")
+            self.button_stop_or_start_line.setText("Запустить дефектоскоп")
+            self.line_status = 0
+        elif status == 2:
+            self.label_status.setText("СТАТУС: <b style='color: red;'>ОШИБКА</b>")
+            self.line_status = 2
+            self.button_stop_or_start_line.setText("ПЕРЕЗАГРУЗКА")
 
     def initUI(self):
         self.setWindowTitle(self.title)
