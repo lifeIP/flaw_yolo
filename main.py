@@ -29,10 +29,29 @@ class ManagePThread(QThread):
     def __init__(self):
         super().__init__()
         
-        self.cam_index_0 = 0 
-        self.cam_index_1 = 2
-        self.cam_index_2 = 4
-        self.cam_index_3 = 6
+        # получаем список всех камер
+        ids = list()
+        for i in range(100):
+            try:
+                cap = cv2.VideoCapture(i)
+                ret, src = cap.read()
+                if ret:
+                    ids.append(i)
+                    cap.release()
+            except:
+                pass
+        
+        if(len(ids) < 4):
+            logger.warning(f"Критическая ошибка: было найдено только {len(ids)} камер! {ids}")
+            self.cam_index_0 = ids[0]
+
+        else:
+            self.cam_index_0 = ids[0] 
+            self.cam_index_1 = ids[1]
+            self.cam_index_2 = ids[2]
+            self.cam_index_3 = ids[3]
+        #TODO: надо сделать автоматический выбор камер
+
         self.frame_rate = 5
         self.confidence_threshold = 4500 # 0 - 9999
         
