@@ -66,8 +66,7 @@ class ManagePThread(QThread):
         
         from src.work_with_files import load_settings_from_file
         crop_left, crop_right, crop_up, crop_down, confidence_threshold = load_settings_from_file(0)
-
-        
+                
         if not cap.isOpened():
             print(f"Не удалось открыть камеру {cam_index}")
             return
@@ -79,16 +78,16 @@ class ManagePThread(QThread):
             if start_or_stop[1]:
                 break
 
-            if not start_or_stop[0]:
-                continue
-
             if not ret:
                 break
 
             cropped_frame = frame[crop_up:crop_down, crop_left:crop_right]
+
+            if not start_or_stop[0]:
+                continue
+
+            
             array_cam.append(cropped_frame)
-            
-            
             
             time_on_frame = time.time() - start_time
             
@@ -99,9 +98,9 @@ class ManagePThread(QThread):
 
 
 
+    # Функция 
     def yolo_data_processing(self, array_cam, confidence_threshold, start_or_stop, counts_of_flaws):
         
-
         while(True):
             if start_or_stop[1]:
                 break
@@ -117,7 +116,6 @@ class ManagePThread(QThread):
             detections = model(arr)
 
             for obj in detections:
-                from src.draw_something import draw_bounding_boxes
                 opencv_array = cv2.cvtColor(obj.orig_img, cv2.COLOR_RGB2BGR)
                 
 
@@ -149,21 +147,45 @@ class ManagePThread(QThread):
                     cv2.imwrite(f"{directory_with_boxes}/{file_name}.png", opencv_array)
 
 
+
     def run(self):
         thread_0 = mp.Process(target=self.get_image_from_cam, args=(self.cam_index_0, self.array_cam_0, self.frame_rate, self.start_or_stop))
-        thread_4 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
+        # thread_1 = mp.Process(target=self.get_image_from_cam, args=(self.cam_index_1, self.array_cam_1, self.frame_rate, self.start_or_stop))
+        # thread_2 = mp.Process(target=self.get_image_from_cam, args=(self.cam_index_2, self.array_cam_2, self.frame_rate, self.start_or_stop))
+        # thread_3 = mp.Process(target=self.get_image_from_cam, args=(self.cam_index_3, self.array_cam_3, self.frame_rate, self.start_or_stop))
         
+        thread_4 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
+        # thread_5 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_1, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
+        # thread_6 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_2, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
+        # thread_7 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_3, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
+
 
         thread_0.start()
+        # thread_1.start()
+        # thread_2.start()
+        # thread_3.start()
+        
         thread_4.start()
+        # thread_5.start()
+        # thread_6.start()
+        # thread_7.start()
+
 
         thread_0.join()
+        # thread_1.join()
+        # thread_2.join()
+        # thread_3.join()
+
         thread_4.join()
+        # thread_5.join()
+        # thread_6.join()
+        # thread_7.join()
 
     
 
 
 class App(QWidget):
+
     def keyPressEvent(self, event):
         # если нажата клавиша F11
         if event.key() == Qt.Key.Key_F11:
@@ -201,20 +223,25 @@ class App(QWidget):
     signal_start_or_stop = pyqtSignal(bool)
     signal_close_thread = pyqtSignal(bool)
 
+
     pyqtSlot()
     def slot_reset_defects_counter(self):
         self.count_of_defects = 0
 
+
     def closeEvent(self, e):
         self.signal_close_thread.emit(True)
         e.accept()
-    
+
+
     
     def slot_button_stop_or_start_line(self):
         print("Stop/Start")
         self.is_line_start = not self.is_line_start
         self.signal_start_or_stop.emit(self.is_line_start)
         self.slot_change_status(1 if self.is_line_start else 0)
+
+
 
     @pyqtSlot(int)
     def slot_change_status(self, status):
@@ -230,6 +257,8 @@ class App(QWidget):
             self.label_status.setText("СТАТУС: <b style='color: red;'>ОШИБКА</b>")
             self.line_status = 2
             self.button_stop_or_start_line.setText("ПЕРЕЗАГРУЗКА")
+
+
 
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -249,12 +278,6 @@ class App(QWidget):
         button_reset_counter.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
         button_reset_counter.setFont(QFont(None, 28))
         button_reset_counter.clicked.connect(self.slot_reset_defects_counter)
-
-
-        self.label_timer = QLabel("0 сек")
-        self.label_timer.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
-        self.label_timer.setFont(QFont(None, 28))
-        self.label_timer.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
 
         self.label_status = QLabel("СТАТУС")
@@ -278,7 +301,6 @@ class App(QWidget):
         layout_vertical_box_main.addWidget(self.label_count_of_defects, 2)
         layout_vertical_box_main.addWidget(button_reset_counter, 1)
         layout_vertical_box_main.addWidget(placeholder, 5)
-        layout_vertical_box_main.addWidget(self.label_timer, 1)
         layout_vertical_box_main.addWidget(self.label_status, 2)
         layout_vertical_box_main.addWidget(self.button_stop_or_start_line, 4)
 
@@ -290,7 +312,6 @@ class App(QWidget):
         self.show()
 
 
-  
 
 if __name__ == "__main__":
     # Запуск графического приложения
