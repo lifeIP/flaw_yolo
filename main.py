@@ -6,7 +6,7 @@ import  multiprocessing as mp
 import time
 from PIL import Image
 from datetime import datetime
-
+import logging
 
 from PyQt6.QtWidgets    import *
 from PyQt6.QtCore       import *
@@ -18,6 +18,7 @@ ID = 0
 MODEL_PATH = "yolo11n.pt"
 
 
+logger = logging.getLogger(__name__)
 model = YOLO(MODEL_PATH)
 
 
@@ -54,6 +55,7 @@ class ManagePThread(QThread):
 
     pyqtSlot(bool)
     def slot_start_stop(self, start: bool):
+        logger.warning(f"Обработка запущена" if start else "Обработка приостановлена")
         self.mlock.acquire()
         self.start_or_stop[0] = start
         self.mlock.release()
@@ -156,7 +158,8 @@ class ManagePThread(QThread):
                         continue
 
                     counts_of_flaws[0] += 1
-                    
+                    logger.warning(f"Обнаружен дефект: {float(confidence)}:{float(confidence_threshold)/10000} *** {directory_with_boxes}/{file_name}.png")
+
                     if not os.path.exists(directory_with_boxes):
                         os.makedirs(directory_with_boxes)
 
@@ -262,18 +265,20 @@ class App(QWidget):
 
     pyqtSlot()
     def slot_reset_defects_counter(self):
+        logger.warning(f"Сброс счетчика: {self.count_of_defects} -> 0")
         self.count_of_defects = 0
         self.label_count_of_defects.setText(f"{0}")
+        
 
 
     def closeEvent(self, e):
         self.signal_close_thread.emit(True)
+        logger.warning(f"Приложение закрыто")
         e.accept()
 
 
     
     def slot_button_stop_or_start_line(self):
-        print("Stop/Start")
         self.is_line_start = not self.is_line_start
         self.signal_start_or_stop.emit(self.is_line_start)
         self.slot_change_status(1 if self.is_line_start else 0)
@@ -356,7 +361,13 @@ class App(QWidget):
 
 
 if __name__ == "__main__":
+    # Начиаем логирование
+    FORMAT = '%(asctime)s %(message)s'
+    logging.basicConfig(format=FORMAT, filename="flaw.log")
+
+    logger.warning(f"Приложение запущено")
     # Запуск графического приложения
     app = QApplication(sys.argv)
     ex = App()
-    sys.exit(app.exec()) 
+    sys.exit(app.exec())
+    
