@@ -44,8 +44,12 @@ class ManagePThread(QThread):
         self.array_cam_2 = self.manager.list()
         self.array_cam_3 = self.manager.list()
         self.start_or_stop = self.manager.list([False, False])
-        self.counts_of_flaws = self.manager.list([0, 0, 0, 0])
 
+        self.counts_of_flaws_0 = self.manager.list([0])
+        self.counts_of_flaws_1 = self.manager.list([0])
+        self.counts_of_flaws_2 = self.manager.list([0])
+        self.counts_of_flaws_3 = self.manager.list([0])
+        
         self.start()
 
     pyqtSlot(bool)
@@ -59,6 +63,21 @@ class ManagePThread(QThread):
         self.mlock.acquire()
         self.start_or_stop[1] = exit
         self.mlock.release()
+
+    
+    signal_get_error_count = pyqtSignal(int)
+
+    pyqtSlot()
+    def slot_get_error_count(self):
+        self.mlock.acquire()
+        count = self.counts_of_flaws_0[0] + self.counts_of_flaws_1[0] + self.counts_of_flaws_2[0] + self.counts_of_flaws_3[0]
+        self.counts_of_flaws_0[0] = 0
+        self.counts_of_flaws_1[0] = 0
+        self.counts_of_flaws_2[0] = 0
+        self.counts_of_flaws_3[0] = 0
+        self.mlock.release()
+        self.signal_get_error_count.emit(count)
+
 
     def get_image_from_cam(self, cam_index, array_cam, frame_rate, start_or_stop):
         cap = cv2.VideoCapture(cam_index)
@@ -118,7 +137,6 @@ class ManagePThread(QThread):
             for obj in detections:
                 opencv_array = cv2.cvtColor(obj.orig_img, cv2.COLOR_RGB2BGR)
                 
-
                 directory_empty = f"images/empty/{datetime.today().strftime('%Y/%m/%d')}"
                 
                 if not os.path.exists(directory_empty):
@@ -137,7 +155,8 @@ class ManagePThread(QThread):
                     if float(confidence) < float(confidence_threshold)/10000:
                         continue
 
-
+                    counts_of_flaws[0] += 1
+                    
                     if not os.path.exists(directory_with_boxes):
                         os.makedirs(directory_with_boxes)
 
@@ -154,10 +173,10 @@ class ManagePThread(QThread):
         # thread_2 = mp.Process(target=self.get_image_from_cam, args=(self.cam_index_2, self.array_cam_2, self.frame_rate, self.start_or_stop))
         # thread_3 = mp.Process(target=self.get_image_from_cam, args=(self.cam_index_3, self.array_cam_3, self.frame_rate, self.start_or_stop))
         
-        thread_4 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
-        # thread_5 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_1, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
-        # thread_6 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_2, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
-        # thread_7 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_3, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws))
+        thread_4 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_0, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws_0))
+        # thread_5 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_1, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws_1))
+        # thread_6 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_2, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws_2))
+        # thread_7 = mp.Process(target=self.yolo_data_processing, args=(self.array_cam_3, self.confidence_threshold, self.start_or_stop, self.counts_of_flaws_3))
 
 
         thread_0.start()
@@ -216,17 +235,35 @@ class App(QWidget):
         self.worker_thread = QThread(self)
         self.manage = ManagePThread()
         
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.slot_timer_timeout)
+
+
         self.initUI()
         self.slot_change_status(1 if self.is_line_start else 0)
+        self.timer.start(300)
 
+    pyqtSlot()
+    def slot_timer_timeout(self):
+        self.signal_get_error_count.emit()
+        self.timer.start(300)
 
     signal_start_or_stop = pyqtSignal(bool)
     signal_close_thread = pyqtSignal(bool)
+
+    signal_get_error_count = pyqtSignal()
+    
+
+    pyqtSlot(int)
+    def slot_get_error_count(self, counts):
+        self.count_of_defects += counts
+        self.label_count_of_defects.setText(f"{self.count_of_defects}")
 
 
     pyqtSlot()
     def slot_reset_defects_counter(self):
         self.count_of_defects = 0
+        self.label_count_of_defects.setText(f"{0}")
 
 
     def closeEvent(self, e):
@@ -303,6 +340,11 @@ class App(QWidget):
         layout_vertical_box_main.addWidget(placeholder, 5)
         layout_vertical_box_main.addWidget(self.label_status, 2)
         layout_vertical_box_main.addWidget(self.button_stop_or_start_line, 4)
+
+
+        self.signal_get_error_count.connect(self.manage.slot_get_error_count)        
+        self.manage.signal_get_error_count.connect(self.slot_get_error_count)
+
 
         self.signal_start_or_stop.connect(self.manage.slot_start_stop)
         self.signal_close_thread.connect(self.manage.slot_exit_thread)
