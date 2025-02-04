@@ -11,6 +11,7 @@ import logging
 from PyQt6.QtWidgets    import *
 from PyQt6.QtCore       import *
 from PyQt6.QtGui        import *
+from PyQt6.QtSerialPort import *
 
 
 IS_DEBUG = True
@@ -50,7 +51,7 @@ class ManagePThread(QThread):
             self.cam_index_1 = ids[1]
             self.cam_index_2 = ids[2]
             self.cam_index_3 = ids[3]
-        #TODO: надо сделать автоматический выбор камер
+        #TODO: надо сделать автоматический выбор камер и если нет достаточного количества, то должно быть сообщено об ошибке пользователю
 
         self.frame_rate = 5
         self.confidence_threshold = 4500 # 0 - 9999
@@ -122,6 +123,7 @@ class ManagePThread(QThread):
                 break
 
             cropped_frame = frame[crop_up:crop_down, crop_left:crop_right]
+            # TODO: Надо реализовать настройки для всех параметров, которые нужны для работы
 
             if not start_or_stop[0]:
                 continue
@@ -134,7 +136,7 @@ class ManagePThread(QThread):
             if calculated_time_on_frame - time_on_frame > 0:
                 time.sleep(calculated_time_on_frame - time_on_frame)
             
-            #TODO: надо реализовать функцию, которая отвечает за переполнение буфера
+            #TODO: Надо реализовать функцию, которая отвечает за переполнение буфера. Например принудительное удаление некоторых кадров. 
 
 
 
@@ -225,6 +227,35 @@ class ManagePThread(QThread):
     
 
 
+class SenderThread(QThread):
+    rx_signal = pyqtSignal(bytes)
+
+    def __init__(self):
+        super().__init__()
+
+        port = "/dev/ttyACM0"
+        self.serport = QSerialPort()
+        self.serport.setBaudRate(9600)
+        self.serport.setPortName(port)
+        self.serport.open(QIODevice.OpenModeFlag.ReadWrite)
+
+        self.start()
+
+
+    def run(self):
+        while True:
+            self.senddata("green")
+            time.sleep(2)
+            self.senddata("red")
+            # time.sleep(2)
+
+    def senddata(self, data:str):
+        tx_data = bytes(data.encode())
+        self.serport.write(tx_data)
+
+    
+
+
 class App(QWidget):
 
     def keyPressEvent(self, event):
@@ -256,6 +287,10 @@ class App(QWidget):
 
         self.worker_thread = QThread(self)
         self.manage = ManagePThread()
+
+        self.serial_thread = QThread(self)
+        self.manage_serial = SenderThread()
+
         
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.slot_timer_timeout)
@@ -264,6 +299,7 @@ class App(QWidget):
         self.initUI()
         self.slot_change_status(1 if self.is_line_start else 0)
         self.timer.start(300)
+
 
     pyqtSlot()
     def slot_timer_timeout(self):
@@ -374,6 +410,11 @@ class App(QWidget):
         self.signal_close_thread.connect(self.manage.slot_exit_thread)
         self.manage.moveToThread(self.worker_thread)
         self.worker_thread.start()
+
+
+        self.manage_serial.moveToThread(self.serial_thread)
+        self.serial_thread.start()
+
 
         self.show()
 
