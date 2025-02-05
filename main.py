@@ -1,6 +1,7 @@
 import os
 import sys
 import cv2
+import serial.serialutil
 from ultralytics import YOLO
 import  multiprocessing as mp
 import time
@@ -11,7 +12,8 @@ import logging
 from PyQt6.QtWidgets    import *
 from PyQt6.QtCore       import *
 from PyQt6.QtGui        import *
-from PyQt6.QtSerialPort import *
+
+import serial
 
 
 IS_DEBUG = True
@@ -232,27 +234,72 @@ class SenderThread(QThread):
 
     def __init__(self):
         super().__init__()
+        
+        is_found = False
+        self.port = ""
 
-        port = "/dev/ttyACM0"
-        self.serport = QSerialPort()
-        self.serport.setBaudRate(9600)
-        self.serport.setPortName(port)
-        self.serport.open(QIODevice.OpenModeFlag.ReadWrite)
+        for i in range(64) :
+            try :
+                self.port = f"/dev/ttyACM{i}"
+                ser = serial.Serial(self.port)
+                ser.close()
+                is_found = True
+                break
+
+            except serial.serialutil.SerialException:
+                pass
+
+        if not is_found:
+            logger.warning(f"Критическая ошибка: не было найдено подключенного com-порт устройства")
+            return
+        
+        self.serial_port = serial.Serial(self.port)
+        self.serial_port.baudrate=9600
 
         self.start()
 
 
     def run(self):
         while True:
-            self.senddata("green")
-            time.sleep(2)
-            self.senddata("red")
-            # time.sleep(2)
+            
+            try:
+                self.serial_port.writelines(["red".encode()])
+                line = self.serial_port.readline()
+                print(line)
+                time.sleep(1)
+                self.serial_port.writelines(["green".encode()])
+                line = self.serial_port.readline()
+                print(line)
+                time.sleep(1)
+            except:
+                is_found = False
+                
+                try:
+                    self.serial_port.close()
+                except:
+                    pass
 
-    def senddata(self, data:str):
-        tx_data = bytes(data.encode())
-        self.serport.write(tx_data)
+                for i in range(64) :
+                    try :
+                        self.port = f"/dev/ttyACM{i}"
+                        ser = serial.Serial(self.port)
+                        ser.close()
+                        is_found = True
+                        break
 
+                    except serial.serialutil.SerialException:
+                        pass
+
+                if not is_found:
+                    logger.warning(f"Критическая ошибка: не было найдено подключенного com-порт устройства")
+                else:
+                    self.serial_port = serial.Serial(self.port)
+                    self.serial_port.baudrate=9600
+
+
+
+
+    
     
 
 
