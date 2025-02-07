@@ -308,11 +308,7 @@ class SenderThread(QThread):
                     self.serial_port = serial.Serial(self.port)
                     self.serial_port.baudrate=9600
 
-
-
-
-    
-    
+        
 
 
 class App(QWidget):
@@ -428,8 +424,8 @@ class App(QWidget):
 
     pyqtSlot(int)
     def slot_critical_error(self, er_id):
+        print("critical_error", er_id)
         # TODO: При возникновении критических ошибок линия должна останавливаться, а также на экране должна отобразиться надпись ОШИБКА
-        pass
 
             
 
