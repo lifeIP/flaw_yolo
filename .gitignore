@@ -1,4 +1,5 @@
 .venv/
+logs/
 /yolov8s.pt
 /yolo11m.pt
 

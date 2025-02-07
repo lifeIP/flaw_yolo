@@ -32,6 +32,8 @@ except:
 
 class ManagePThread(QThread):
     
+    signal_critical_error = pyqtSignal(int)
+
     def __init__(self):
         super().__init__()
         
@@ -49,6 +51,9 @@ class ManagePThread(QThread):
         
         if(len(ids) < 4):
             logger.warning(f"Критическая ошибка: было найдено только {len(ids)} камер! {ids}")
+            self.signal_critical_error.emit(0)
+
+            #TODO: надо сделать автоматический выбор камер и если нет достаточного количества, то должно быть сообщено об ошибке пользователю    
             self.cam_index_0 = ids[0]
 
         else:
@@ -56,8 +61,8 @@ class ManagePThread(QThread):
             self.cam_index_1 = ids[1]
             self.cam_index_2 = ids[2]
             self.cam_index_3 = ids[3]
-        #TODO: надо сделать автоматический выбор камер и если нет достаточного количества, то должно быть сообщено об ошибке пользователю
-
+            
+        
         self.frame_rate = 5
         self.confidence_threshold = 4500 # 0 - 9999
         
@@ -114,7 +119,8 @@ class ManagePThread(QThread):
         crop_left, crop_right, crop_up, crop_down, confidence_threshold = load_settings_from_file(0)
                 
         if not cap.isOpened():
-            print(f"Не удалось открыть камеру {cam_index}")
+            self.signal_critical_error.emit(1)
+            logger.warning(f"Критическая ошибка: Не удалось получить доступ к камере с id:{cam_index}")
             return
 
         while True:
@@ -395,6 +401,7 @@ class App(QWidget):
 
     signal_start_stop_line = pyqtSignal(bool)
 
+    pyqtSlot()
     def slot_button_stop_or_start_line(self):
         self.is_line_start = not self.is_line_start
         self.signal_start_or_stop.emit(self.is_line_start)
@@ -419,6 +426,12 @@ class App(QWidget):
             self.button_stop_or_start_line.setText("ПЕРЕЗАГРУЗКА")
 
 
+    pyqtSlot(int)
+    def slot_critical_error(self, er_id):
+        # TODO: При возникновении критических ошибок линия должна останавливаться, а также на экране должна отобразиться надпись ОШИБКА
+        pass
+
+            
 
     def initUI(self):
         self.setWindowTitle(self.title)
@@ -469,11 +482,14 @@ class App(QWidget):
         self.manage.signal_get_error_count.connect(self.slot_get_error_count)
 
 
+        self.manage.signal_critical_error.connect(self.slot_critical_error)
         self.signal_start_or_stop.connect(self.manage.slot_start_stop)
         self.signal_close_thread.connect(self.manage.slot_exit_thread)
         self.manage.moveToThread(self.worker_thread)
         self.worker_thread.start()
 
+
+        
         self.signal_start_stop_line.connect(self.manage_serial.slot_start_stop)
         self.manage_serial.moveToThread(self.serial_thread)
         self.serial_thread.start()
@@ -484,6 +500,9 @@ class App(QWidget):
 
 
 if __name__ == "__main__":
+    import shutil
+    shutil.move("flaw.log", f"logs/{int(time.time())}.log")
+
     # Начиаем логирование
     FORMAT = '%(asctime)s %(message)s'
     logging.basicConfig(format=FORMAT, filename="flaw.log")
