@@ -1,14 +1,5 @@
 .venv/
-logs/
-/yolov8s.pt
-/yolo11m.pt
-
 *.png
-
 __pycache__/
 *.py[cod]
-
 *.log
-
-./flaw.log
-/flaw.log
