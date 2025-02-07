@@ -9,4 +9,5 @@ __pycache__/
 
 *.log
 
+./flaw.log
 /flaw.log

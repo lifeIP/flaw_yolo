@@ -15,7 +15,6 @@ from PyQt6.QtGui        import *
 
 import serial
 
-
 IS_DEBUG = True
 ID = 0
 MODEL_PATH = "yolo11n.pt"
@@ -25,6 +24,10 @@ logger = logging.getLogger(__name__)
 model = YOLO(MODEL_PATH)
 
 
+try:
+    model.to('cuda')
+except:
+    pass
 
 
 class ManagePThread(QThread):
@@ -230,7 +233,10 @@ class ManagePThread(QThread):
 
 
 class SenderThread(QThread):
-    rx_signal = pyqtSignal(bytes)
+
+    pyqtSlot(bool)
+    def slot_start_stop(self, flag:bool):
+        self.line_is_start = "green" if flag else "red"
 
     def __init__(self):
         super().__init__()
@@ -256,6 +262,8 @@ class SenderThread(QThread):
         self.serial_port = serial.Serial(self.port)
         self.serial_port.baudrate=9600
 
+        self.line_is_start = "red"
+        
         self.start()
 
 
@@ -263,14 +271,12 @@ class SenderThread(QThread):
         while True:
             
             try:
-                self.serial_port.writelines(["red".encode()])
+                self.serial_port.writelines([self.line_is_start.encode()])
                 line = self.serial_port.readline()
-                print(line)
-                time.sleep(1)
-                self.serial_port.writelines(["green".encode()])
-                line = self.serial_port.readline()
-                print(line)
-                time.sleep(1)
+                
+                if "ONLINE" not in line:
+                    logger.warning(f"Критическая ошибка: Не было получено корректного ответа от платы управления")
+
             except:
                 is_found = False
                 
@@ -361,6 +367,14 @@ class App(QWidget):
 
     pyqtSlot(int)
     def slot_get_error_count(self, counts):
+    
+        if counts != 0:
+            self.signal_start_stop_line.emit(0)
+            self.is_line_start = False
+            self.signal_start_or_stop.emit(self.is_line_start)
+            self.slot_change_status(1 if self.is_line_start else 0)
+    
+
         self.count_of_defects += counts
         self.label_count_of_defects.setText(f"{self.count_of_defects}")
 
@@ -379,10 +393,12 @@ class App(QWidget):
         e.accept()
 
 
-    
+    signal_start_stop_line = pyqtSignal(bool)
+
     def slot_button_stop_or_start_line(self):
         self.is_line_start = not self.is_line_start
         self.signal_start_or_stop.emit(self.is_line_start)
+        self.signal_start_stop_line.emit(1 if self.is_line_start else 0)
         self.slot_change_status(1 if self.is_line_start else 0)
 
 
@@ -458,7 +474,7 @@ class App(QWidget):
         self.manage.moveToThread(self.worker_thread)
         self.worker_thread.start()
 
-
+        self.signal_start_stop_line.connect(self.manage_serial.slot_start_stop)
         self.manage_serial.moveToThread(self.serial_thread)
         self.serial_thread.start()
 
